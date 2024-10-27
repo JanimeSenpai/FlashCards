@@ -2,6 +2,7 @@ package com.example.flashcards
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -20,9 +21,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -59,7 +61,7 @@ fun QuestionsPage(
 
 
     LaunchedEffect(cardset) {
-        cards.value = getCards(cardset)
+        cards.value = getCardsFromFile(cardset)
         viewModel.importCards(cards.value)
         viewModel.onNextClick()
     }
@@ -86,6 +88,8 @@ fun QuestionsPage(
                 verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                progressbar(uiState.progress)
+
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -99,7 +103,8 @@ fun QuestionsPage(
                                 .wrapContentSize()
                         ) {
 
-                            Column(
+                            AnimatedVisibility(uiState.endOfCardList==false){
+                                Column(
                                 Modifier
                                     .padding(64.dp)
                                     .verticalScroll(rememberScrollState()),
@@ -107,51 +112,85 @@ fun QuestionsPage(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
 
-                                uiState.currentCard?.let {
-                                    Stopwatch(
-                                        it.szoveg,
-                                        uiState.endOfCardList
-                                    )
-                                }
 
-                                if (uiState.currentCard?.kep != null) {
-                                    Image(
-                                        bitmap = File("cardsets/$cardset/${uiState.currentCard?.kep}").readBytes()
-                                            .decodeToImageBitmap(),
-                                        contentDescription = "Card Image",
-                                    )
-                                }
-
-
-                                OutlinedTextField(
-                                    value = uiState.userinput,
-                                    onValueChange = { viewModel.enterText(it) },
-                                    label = { Text("Enter your answer here") },
-                                    modifier = Modifier.onPreviewKeyEvent { it ->
-                                        if (it.key == Key.Enter || it.key == Key.Tab) {
-                                            // viewModel.enterText(uiState.userinput.dropLast(1))
-                                            var displayresult:Boolean=false
-                                            var actiondone = false
-                                            if (uiState.displayResult == false&&displayresult==false) {//hogyha nincs megjelenítve a megoldásablak
-                                              //  displayresult=true
-                                                actiondone=true
-                                                viewModel.checkAnswer()
-                                            }
-
-                                            if (uiState.displayResult&&actiondone==false) {
-                                                viewModel.onNextClick()
-                                            }
-
-                                            true
-                                        } else {
-                                            false
-                                        }
+                                    uiState.currentCard?.let {
+                                        Stopwatch(
+                                            it.szoveg,
+                                            uiState.endOfCardList
+                                        )
                                     }
-                                )
-                                Button(onClick = { viewModel.checkAnswer() }) {
-                                    Text("Check")
+
+                                    if (uiState.currentCard?.kep != null) {
+                                        Image(
+                                            bitmap = File("cardsets/$cardset/${uiState.currentCard?.kep}").readBytes()
+                                                .decodeToImageBitmap(),
+                                            contentDescription = "Card Image",
+                                        )
+                                    }
+                                    var enterpressed by mutableStateOf(0)
+                                    var displayresult: Boolean = false
+                                    var actiondone = false
+
+                                    OutlinedTextField(
+                                        value = uiState.userinput,
+                                        onValueChange = { viewModel.enterText(it) },
+                                        label = { Text("Enter your answer here") },
+                                        modifier = Modifier.onPreviewKeyEvent { it ->
+                                            if ((it.key == Key.Enter || it.key == Key.Tab) && it.type == KeyEventType.KeyDown) {
+                                                println("enter pressed")
+                                                // viewModel.enterText(uiState.userinput.dropLast(1))
+                                                enterpressed++
+
+                                                coroutineScope.launch {
+                                                    if (uiState.displayResult == false) {
+                                                        viewModel.checkAnswer()
+                                                        return@launch
+                                                    }
+                                                    // delay(10)
+                                                    if (uiState.displayResult) viewModel.onNextClick()
+                                                }
+                                                /*
+
+                                                 }
+                                                if(!uiState.displayResult==false) {
+                                                     println("checkAnswer")
+                                                     viewModel.checkAnswer()
+                                                    // return@onPreviewKeyEvent true
+                                                 }
+
+                                                 if(uiState.displayResult)  {
+                                                     println("onNextClick")
+                                                     viewModel.onNextClick()
+                                                    // return@onPreviewKeyEvent true
+                                                 }*/
+                                                //println("whats goin on")
+
+                                                //  println("why these wont run")
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+                                    )
+                                    LaunchedEffect(enterpressed) {
+
+
+                                    }
+
+                                    Button(onClick = { viewModel.checkAnswer() }) {
+                                        Text("Check")
+                                    }
+                                }
+
+
+                            }
+                            AnimatedVisibility(uiState.endOfCardList) {
+                                Column(Modifier.size(360.dp), horizontalAlignment = Alignment.CenterHorizontally,verticalArrangement = Arrangement.Center){
+                                    Text("End of list\nAccuracy: ${uiState.accuracy}%", style = MaterialTheme.typography.headlineLarge,textAlign = TextAlign.Center)
                                 }
                             }
+
+
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         AnimatedVisibility(uiState.displayResult) {
@@ -202,7 +241,7 @@ fun QuestionsPage(
     )
 }
 
-fun getCards(cardset: String): List<card> {
+fun getCardsFromFile(cardset: String): List<card> {
     val f = File("cardsets/$cardset/strings.txt")
     val lines = f.readLines()
     var list = mutableListOf<card>()
@@ -328,6 +367,17 @@ fun QuestionControls(
 
     }
 }
+@Composable
+fun progressbar(progress:Float){
+
+    val animatedProgress by     animateFloatAsState(         targetValue = progress,         animationSpec = ProgressIndicatorDefaults. ProgressAnimationSpec     )
+    LinearProgressIndicator(
+        progress = { animatedProgress },
+        modifier = Modifier.fillMaxWidth(0.6f),
+    )
+}
+
+
 /*
 @Composable
 fun DisplayImageFromFile(filePath: String, modifier: Modifier = Modifier) {
