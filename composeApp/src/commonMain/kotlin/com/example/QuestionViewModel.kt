@@ -10,8 +10,11 @@ import kotlinx.coroutines.flow.update
 data class CardPageUIState(
     val remainingCards: List<card> = emptyList(),
     val askedCards: List<card> = emptyList(),
-    val currentCard: card = card("lorem ipsum","1.png"),
-    val endOfCardList: Boolean = false
+    val currentCard: card = card("lorem ipsum", "1.png"),
+    val endOfCardList: Boolean = false,
+    val userinput: String = "",
+    val displayResult: Boolean = false,
+    val isCorrect: Boolean = false
 )
 
 class CardsViewModel(
@@ -21,26 +24,30 @@ class CardsViewModel(
     private val _uiState = MutableStateFlow(CardPageUIState())
     val uiState: StateFlow<CardPageUIState> = _uiState.asStateFlow()
 
-
-
-
-
-
-
-   /* fun onBackClick() {
-        if (_askedCards.value.isNotEmpty()) {
-            // Add the current question back to the remaining questions
-            _remainingCards.value = _remainingCards.value.toMutableList().apply {
-                add(0, _currentCard.value)
-            }
-
-            // Get the last asked question and set it as the current question
-            val lastAskedQuestion = _askedCards.value.removeLast()
-            _currentCard.value = lastAskedQuestion
+    fun enterText(text: String) {
+        _uiState.update {
+            it.copy(
+                userinput = text
+            )
         }
-    }*/
+    }
 
-    fun onNextClick(isRandom: Boolean, isLoopEnabled: Boolean){
+
+    /* fun onBackClick() {
+         if (_askedCards.value.isNotEmpty()) {
+             // Add the current question back to the remaining questions
+             _remainingCards.value = _remainingCards.value.toMutableList().apply {
+                 add(0, _currentCard.value)
+             }
+
+             // Get the last asked question and set it as the current question
+             val lastAskedQuestion = _askedCards.value.removeLast()
+             _currentCard.value = lastAskedQuestion
+         }
+     }*/
+
+
+    fun onNextClick(isRandom: Boolean, isLoopEnabled: Boolean) {
         /*
 
         if (_remainingCards.value.isNotEmpty()) {
@@ -84,21 +91,46 @@ class CardsViewModel(
 
 
     fun importCards(newCards: List<card>) {
-        cards  = newCards.toMutableList()
+        cards = newCards.toMutableList()
         resetForLooping(preserveLastQuestion = false)
     }
+
     fun resetForLooping(preserveLastQuestion: Boolean) {
         _uiState.update {
-
             it.copy(
                 remainingCards = cards.toMutableList(),
-                askedCards =if(!preserveLastQuestion ){ emptyList() }else{it.askedCards},
+                askedCards = if (!preserveLastQuestion) {
+                    emptyList()
+                } else {
+                    it.askedCards
+                },
                 currentCard = cards.first(),
                 endOfCardList = false
             )
         }
 
     }
+
+    fun checkAnswer() {
+        val isCorrect: Boolean
+        if (uiState.value.userinput == uiState.value.currentCard.szoveg) {
+            isCorrect = true
+        } else {
+            isCorrect = false
+        }
+        _uiState.update {
+            it.copy(
+                isCorrect = isCorrect,
+                displayResult = true
+            )
+        }
+    }
+    fun shuffleCards() {
+
+    }
+
 }
+
+
 
 data class card(val szoveg: String, val kep: String)

@@ -46,9 +46,9 @@ fun QuestionsPage(
     val cards = remember { mutableStateOf<List<card>>(emptyList()) }
     val viewModel: CardsViewModel = remember { CardsViewModel(cards.value) }
 
+    val uiState by viewModel.uiState.collectAsState()
 
-    val currentCard by viewModel.currentCard.collectAsState()
-    val isEndOfList by viewModel.endofCardList.collectAsState()
+
 
 
     LaunchedEffect(cardset) {
@@ -60,7 +60,7 @@ fun QuestionsPage(
     println("platform=$platform")
     Scaffold(
         floatingActionButton = {
-            if (isEndOfList|| "Android" !in platform /*platform=="Web with Kotlin/Wasm"*/) {
+            if (uiState.endOfCardList|| "Android" !in platform /*platform=="Web with Kotlin/Wasm"*/) {
                 FloatingActionButton(
                     onClick = { navController.navigate("main") },
                     modifier = Modifier.padding(16.dp)
@@ -83,31 +83,66 @@ fun QuestionsPage(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = Shapes().large,
-                        modifier = Modifier
-                            .animateContentSize()
-                            .wrapContentSize()
-                    ) {
-                        Column(
-                            Modifier
-                                .padding(16.dp)
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
+                    Row(verticalAlignment = Alignment.CenterVertically){
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = Shapes().large,
+                            modifier = Modifier
+                                .animateContentSize()
+                                .wrapContentSize()
                         ) {
+                            Column(
+                                Modifier
+                                    .padding(64.dp)
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
                                 Image(
-                                    bitmap =File("cardsets/$cardset/${currentCard.kep}").readBytes().decodeToImageBitmap(),
+                                    bitmap =File("cardsets/$cardset/${uiState.currentCard.kep}").readBytes().decodeToImageBitmap(),
                                     contentDescription = "Card Image",
                                 )
 
-                            TextField(
+                                OutlinedTextField(
+                                    value = uiState.userinput,
+                                    onValueChange = { viewModel.enterText(it) },
+                                    label = {Text("Enter your answer here")}
+                                )
+                                Button(onClick = {viewModel.checkAnswer()}){
+                                    Text("Check")
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        AnimatedVisibility(uiState.displayResult){
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = Shapes().large,
+                                modifier = Modifier
+                                    .animateContentSize()
+                                    .sizeIn(minWidth = 160.dp, minHeight =160.dp, maxWidth = 320.dp, maxHeight = 320.dp)
+                                    //.wrapContentSize()
 
-                            )
+                            ) {
+                                Column(
+                                    Modifier
+                                        .padding(64.dp)
+                                ){
+                                    if(uiState.isCorrect){
+                                        Text("Correct!")
+                                    }
+                                    else{
+                                        Text("Wrong!")
+                                        Text("The correct answer was: ${uiState.currentCard.szoveg}")
+                                    }
+                                    Button(onClick = {}){ Text("Next")}
+                                }
 
+
+                            }
                         }
                     }
+
                 }
             }
         }
@@ -119,7 +154,7 @@ val f = File("cardsets/$cardset/strings.txt")
     val lines = f.readLines()
     var list = mutableListOf<card>()
     lines.forEachIndexed {index, it ->
-        list.add(card(it,"${index+1}.png"))
+        list.add(card(it.toLowerCase(),"${index+1}.png"))
     }
     return list
 }
