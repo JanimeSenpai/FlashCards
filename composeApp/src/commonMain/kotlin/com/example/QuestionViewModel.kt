@@ -10,11 +10,13 @@ import kotlinx.coroutines.flow.update
 data class CardPageUIState(
     val remainingCards: List<card> = emptyList(),
     val askedCards: List<card> = emptyList(),
-    val currentCard: card = card("lorem ipsum", "1.png"),
+    val currentCard: card? = null,
     val endOfCardList: Boolean = false,
     val userinput: String = "",
     val displayResult: Boolean = false,
-    val isCorrect: Boolean = false
+    val isCorrect: Boolean = false,
+    val shuffle: Boolean = true,
+    val isLoopEnabled: Boolean = false,
 )
 
 class CardsViewModel(
@@ -47,46 +49,71 @@ class CardsViewModel(
      }*/
 
 
-    fun onNextClick(isRandom: Boolean, isLoopEnabled: Boolean) {
-        /*
+    fun onNextClick() {
 
-        if (_remainingCards.value.isNotEmpty()) {
+
+        if (uiState.value.remainingCards.isNotEmpty()) {
             // Add the current question to the asked questions
-            if (_currentCard.value!=null) {
-                _askedCards.value = _askedCards.value.toMutableList().apply {
-                    add(_currentCard.value)
+            if (uiState.value.currentCard!=null&&uiState.value.isCorrect) {//lehet hogy itt feleslegesen van duplán ellenőrizve //ha az aktuális kártya nem null és a feladat helyesen lett megválaszolva az imént
+                _uiState.update {
+                    it.copy(
+                        askedCards = it.askedCards.toMutableList().apply {
+                            it.currentCard?.let { it1 -> add(it1) }
+                        }
+                    )
                 }
             }
 
             // Get the next question
-            val nextIndex = if (isRandom) {
-                _remainingCards.value.indices.random()
+            if(uiState.value.shuffle){
+                _uiState.update { it.copy(
+                    remainingCards = it.remainingCards.shuffled()
+                ) }
+            }
+
+
+            val nextIndex =0  /* annyit módosítottunk, hogy a következő elem mindig az első a listában. a lista hátralevő részét viszont mindig randomizáljuk.*/
+            /* if (uiState.value.shuffle) {
+                uiState.value.remainingCards.indices.random()
             } else {
                 0 // Always take the first question in non-random mode
+            }*/
+
+
+
+            val nextCard = uiState.value.remainingCards[nextIndex]
+            // Remove the used question from the remaining questions
+            _uiState.update {
+                val newlist = it.remainingCards.toMutableList().filterIndexed { index, card -> index!=nextIndex }
+                it.copy(remainingCards = newlist)
             }
 
-            val nextCard = _remainingCards.value[nextIndex]
-            _remainingCards.value = _remainingCards.value.toMutableList().apply {
-                removeAt(nextIndex)
-            }
 
             // Update the current question
-            _currentCard.value = nextCard
+            _uiState.update {
+                it.copy(currentCard = nextCard,
+                    userinput = "",
+                    displayResult = false,)
+            }
+
+
 
 
         } else {
-            if (isLoopEnabled) {
+            if (uiState.value.isLoopEnabled) {
                 resetForLooping(preserveLastQuestion = true)
-                if (_remainingCards.value.isNotEmpty()) {
-                    onNextClick(isRandom, isLoopEnabled)
+                if (uiState.value.remainingCards.isNotEmpty()) {
+                    onNextClick()
                 }
             } else {
-                _endOfCardList.value = true
+                _uiState.update {
+                    it.copy(endOfCardList = true)
+                }
                 // return "We reached the end of the question list" //todo handle separately
             }
         }
 
-        */
+
     }
 
 
@@ -113,7 +140,7 @@ class CardsViewModel(
 
     fun checkAnswer() {
         val isCorrect: Boolean
-        if (uiState.value.userinput == uiState.value.currentCard.szoveg) {
+        if (uiState.value.userinput == uiState.value.currentCard?.szoveg ?: "card not found") {
             isCorrect = true
         } else {
             isCorrect = false
@@ -125,12 +152,12 @@ class CardsViewModel(
             )
         }
     }
+
     fun shuffleCards() {
 
     }
 
 }
-
 
 
 data class card(val szoveg: String, val kep: String)

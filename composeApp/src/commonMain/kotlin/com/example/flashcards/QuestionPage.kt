@@ -19,6 +19,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.example.CardsViewModel
@@ -27,6 +32,7 @@ import flashcards.composeapp.generated.resources.Res
 import flashcards.composeapp.generated.resources.timer
 
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.decodeToImageBitmap
 import org.jetbrains.compose.resources.painterResource
@@ -47,6 +53,7 @@ fun QuestionsPage(
     val viewModel: CardsViewModel = remember { CardsViewModel(cards.value) }
 
     val uiState by viewModel.uiState.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
 
 
 
@@ -54,13 +61,13 @@ fun QuestionsPage(
     LaunchedEffect(cardset) {
         cards.value = getCards(cardset)
         viewModel.importCards(cards.value)
-        viewModel.onNextClick(isRandom, isLoopEnabled)
+        viewModel.onNextClick()
     }
     var platform = getPlatform().name
     println("platform=$platform")
     Scaffold(
         floatingActionButton = {
-            if (uiState.endOfCardList|| "Android" !in platform /*platform=="Web with Kotlin/Wasm"*/) {
+            if (uiState.endOfCardList || "Android" !in platform /*platform=="Web with Kotlin/Wasm"*/) {
                 FloatingActionButton(
                     onClick = { navController.navigate("main") },
                     modifier = Modifier.padding(16.dp)
@@ -83,7 +90,7 @@ fun QuestionsPage(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically){
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             color = MaterialTheme.colorScheme.primaryContainer,
                             shape = Shapes().large,
@@ -91,6 +98,7 @@ fun QuestionsPage(
                                 .animateContentSize()
                                 .wrapContentSize()
                         ) {
+
                             Column(
                                 Modifier
                                     .padding(64.dp)
@@ -98,44 +106,89 @@ fun QuestionsPage(
                                 verticalArrangement = Arrangement.Center,
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Image(
-                                    bitmap =File("cardsets/$cardset/${uiState.currentCard.kep}").readBytes().decodeToImageBitmap(),
-                                    contentDescription = "Card Image",
-                                )
+
+                                uiState.currentCard?.let {
+                                    Stopwatch(
+                                        it.szoveg,
+                                        uiState.endOfCardList
+                                    )
+                                }
+
+                                if (uiState.currentCard?.kep != null) {
+                                    Image(
+                                        bitmap = File("cardsets/$cardset/${uiState.currentCard?.kep}").readBytes()
+                                            .decodeToImageBitmap(),
+                                        contentDescription = "Card Image",
+                                    )
+                                }
+
 
                                 OutlinedTextField(
                                     value = uiState.userinput,
                                     onValueChange = { viewModel.enterText(it) },
-                                    label = {Text("Enter your answer here")}
+                                    label = { Text("Enter your answer here") },
+                                    modifier = Modifier.onPreviewKeyEvent { it ->
+                                        if (it.key == Key.Enter || it.key == Key.Tab) {
+                                            // viewModel.enterText(uiState.userinput.dropLast(1))
+                                            var displayresult:Boolean=false
+                                            var actiondone = false
+                                            if (uiState.displayResult == false&&displayresult==false) {//hogyha nincs megjelenítve a megoldásablak
+                                              //  displayresult=true
+                                                actiondone=true
+                                                viewModel.checkAnswer()
+                                            }
+
+                                            if (uiState.displayResult&&actiondone==false) {
+                                                viewModel.onNextClick()
+                                            }
+
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    }
                                 )
-                                Button(onClick = {viewModel.checkAnswer()}){
+                                Button(onClick = { viewModel.checkAnswer() }) {
                                     Text("Check")
                                 }
                             }
                         }
                         Spacer(modifier = Modifier.width(16.dp))
-                        AnimatedVisibility(uiState.displayResult){
+                        AnimatedVisibility(uiState.displayResult) {
+                            val modifier = Modifier.sizeIn(
+                                minWidth = 160.dp,
+                                minHeight = 160.dp,
+                                maxWidth = 640.dp,
+                                maxHeight = 640.dp
+                            )
                             Surface(
                                 color = MaterialTheme.colorScheme.primaryContainer,
                                 shape = Shapes().large,
-                                modifier = Modifier
+                                modifier = modifier
                                     .animateContentSize()
-                                    .sizeIn(minWidth = 160.dp, minHeight =160.dp, maxWidth = 320.dp, maxHeight = 320.dp)
-                                    //.wrapContentSize()
+                                    .padding(30.dp)
+                                //.wrapContentSize()
 
                             ) {
                                 Column(
-                                    Modifier
-                                        .padding(64.dp)
-                                ){
-                                    if(uiState.isCorrect){
-                                        Text("Correct!")
+                                    modifier.padding(30.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    val text = if (uiState.isCorrect) {
+                                        "Correct!"
+                                    } else {
+                                        "Wrong!\n\nThe correct answer was: ${uiState.currentCard?.szoveg}"
                                     }
-                                    else{
-                                        Text("Wrong!")
-                                        Text("The correct answer was: ${uiState.currentCard.szoveg}")
-                                    }
-                                    Button(onClick = {}){ Text("Next")}
+                                    Text(
+                                        text,
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        textAlign = TextAlign.Center
+                                    )
+
+
+                                    Button(onClick = {
+                                        viewModel.onNextClick()
+                                    }) { Text("Next") }
                                 }
 
 
@@ -150,11 +203,11 @@ fun QuestionsPage(
 }
 
 fun getCards(cardset: String): List<card> {
-val f = File("cardsets/$cardset/strings.txt")
+    val f = File("cardsets/$cardset/strings.txt")
     val lines = f.readLines()
     var list = mutableListOf<card>()
-    lines.forEachIndexed {index, it ->
-        list.add(card(it.toLowerCase(),"${index+1}.png"))
+    lines.forEachIndexed { index, it ->
+        list.add(card(it.toLowerCase(), "${index + 1}.png"))
     }
     return list
 }
